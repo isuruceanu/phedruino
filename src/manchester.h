@@ -36,26 +36,52 @@ manchester:  1 0 0 1 0 1 1 0 1 0 1 0 0 1 1 0
   #include <pins_arduino.h>
 #endif
 
+ #define IDLE 0
+ #define SENDING 1
+
+
+
+
 class Manchester
 {
   public:
+
+    enum Status 
+    {
+      Idle,
+      Sending,
+      Reading
+    };
+
     Manchester(uint8_t pin); //ctor
-    void StartTransmition();
-    void StopTransmition();
-    void Transmite(uint8_t data);
-    void Transmite(uint8_t *data, uint8_t len);
-    
+    Status GetStatus();
+  
+    void Send(uint8_t *data, uint8_t len);
+    void OnInterrupt();
+
+   /* 
     void StartReading();
     void StopReading();
     int8_t PopQueue(struct Queue* queue);
     void PushQueue(struct Queue* queue, const uint8_t c);
+*/
  
  private:
-  uint8_t _pin;
-  uint16_t computeChecksum(const *uint8_t, uint16_t bytes);
+    void startTransmition();
+    void stopTransmition();  
     
+    void send(uint8_t data);
+    void sendBit();
+
+    uint16_t encode(uint8_t);
   
-}
+    uint8_t _pin;
+    uint16_t *_buffer = 0;
+    uint8_t _bufferLen = 0;
+    uint8_t _bitIndex = 0;
+    uint8_t _byteIndex = 0;
+    Status _status;
+};
 
 
 #endif
