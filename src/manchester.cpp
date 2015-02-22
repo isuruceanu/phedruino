@@ -16,10 +16,12 @@ void Manchester::Send(uint8_t *data, uint8_t len)
 	_byteIndex = 0;
 	_bufferLen = len;
 	uint8_t i = 0;
+
 	do
 	{
 		_buffer[i] = encode(data[i]);
 		i++;
+		
 	}while(i < len);
 
 	startTransmition();
@@ -29,7 +31,7 @@ void Manchester::OnInterrupt()
 {
 	if (_status != Sending) return;
 
-	if (_bitIndex < 8)
+	if (_bitIndex < 16)
 	{
 		sendBit();
 		_bitIndex++;
@@ -38,6 +40,7 @@ void Manchester::OnInterrupt()
 	{
 		_bitIndex = 0;
 		_byteIndex++;
+		Serial.println("--");
 		if (_byteIndex >= _bufferLen)
 		{
 			stopTransmition();
@@ -45,6 +48,12 @@ void Manchester::OnInterrupt()
 		}
 	}
 }
+
+uint16_t Manchester::GetByte(uint8_t data)
+{
+	return encode(data);
+}
+
 
 Manchester::Status Manchester::GetStatus()
 {
@@ -72,13 +81,15 @@ void Manchester::sendBit()
 {
 	if (_byteIndex > _bufferLen) return;
 
-	if (isset(_buffer[_byteIndex], _bitIndex))
+	if (isset(_buffer[_byteIndex], 15- _bitIndex))
 	{
 		digitalWrite(_pin, HIGH);
+		Serial.println("HIGH");
 	}
 	else
 	{
 		digitalWrite(_pin, LOW);
+		Serial.println("LOW");
 	}
 	
 }
@@ -96,6 +107,7 @@ void Manchester::startTransmition()
 	TCCR0B = 0;
 	TCNT0 = 0;
 	OCR0A = 124; // = (16*10^6) / (2000 * 64) -1 (must be less 255)
+	
 	// turn on CTC mode
 	sbi(TCCR0A, WGM01);
   	// Set CS01 and CS00 bits for 64 prescaler

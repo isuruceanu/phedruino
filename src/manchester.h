@@ -48,13 +48,14 @@ class Manchester
 
     enum Status 
     {
-      Idle,
-      Sending,
-      Reading
+      Idle = 0,
+      Sending = 1,
+      Reading = 2
     };
 
     Manchester(uint8_t pin); //ctor
     Status GetStatus();
+    uint16_t GetByte(uint8_t data);
   
     void Send(uint8_t *data, uint8_t len);
     void OnInterrupt();
@@ -76,7 +77,7 @@ class Manchester
     uint16_t encode(uint8_t);
   
     uint8_t _pin;
-    uint16_t *_buffer = 0;
+    uint16_t _buffer[20];
     uint8_t _bufferLen = 0;
     uint8_t _bitIndex = 0;
     uint8_t _byteIndex = 0;
