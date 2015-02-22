@@ -50,7 +50,9 @@ class Manchester
     {
       Idle = 0,
       Sending = 1,
-      Reading = 2
+      Reading = 2,
+      ReadingTimeout =3,
+      ReadingReady = 4,
     };
 
     Manchester(uint8_t pin); //ctor
@@ -58,7 +60,12 @@ class Manchester
     uint16_t GetByte(uint8_t data);
   
     void Send(uint8_t *data, uint8_t len);
+    void StartRead(uint8_t len);
+
+    uint8_t* GetReadData();
+
     void OnInterrupt();
+    void ShowStatus();
 
    /* 
     void StartReading();
@@ -71,10 +78,14 @@ class Manchester
     void startTransmition();
     void stopTransmition();  
     
+    
+
     void send(uint8_t data);
     void sendBit();
 
     uint16_t encode(uint8_t);
+
+    void onPinChangeInterrupt(void);
   
     uint8_t _pin;
     uint16_t _buffer[20];

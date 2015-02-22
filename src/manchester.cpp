@@ -40,7 +40,7 @@ void Manchester::OnInterrupt()
 	{
 		_bitIndex = 0;
 		_byteIndex++;
-		Serial.println("--");
+		
 		if (_byteIndex >= _bufferLen)
 		{
 			stopTransmition();
@@ -84,14 +84,34 @@ void Manchester::sendBit()
 	if (isset(_buffer[_byteIndex], 15- _bitIndex))
 	{
 		digitalWrite(_pin, HIGH);
-		Serial.println("HIGH");
 	}
 	else
 	{
 		digitalWrite(_pin, LOW);
-		Serial.println("LOW");
 	}
 	
+}
+
+void Manchester::ShowStatus()
+{
+   switch(_status)
+   {
+      case Idle:
+       Serial.println("Idle");
+       break;
+      case Sending:
+        Serial.println("Sending");
+        break;
+      case Reading:
+      	Serial.println("Reading");
+      	break;
+      case ReadingTimeout:
+      	Serial.println("Reading timeout");
+      	break;
+      case ReadingReady:
+      	Serial.println("Reading ready");
+      	break;
+   }
 }
 
 /// Will use Timer0 at 2KHz CTC mode. 
@@ -127,4 +147,24 @@ void Manchester::stopTransmition()
 	TCCR0A = 0;
 	TCCR0B = 0;
 	TCNT0 = 0;
+}
+
+void Manchester::StartRead(uint8_t len)
+{
+	if (_status != Idle) return;
+	
+	pinMode(_pin, INPUT); //set pin as input
+	digitalWrite(_pin, HIGH); // enable pullup resistor
+
+	attachInterrupt(_pin, onPinChangeInterrupt, CHANGE);
+}
+
+uint8_t * Manchester::GetReadData()
+{
+
+}
+
+void Manchester::onPinChangeInterrupt()
+{
+
 }

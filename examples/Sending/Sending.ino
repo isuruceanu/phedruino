@@ -19,8 +19,7 @@ void setup() {
 void loop() {
   if (manchester->GetStatus() == Manchester::Idle)
   {
-     Serial.println(manchester->GetStatus());
-     manchester->Send(data, (uint8_t)2);
+     manchester->Send(data, (uint8_t)2);  
   }
 
   Serial.println("end of loop");
