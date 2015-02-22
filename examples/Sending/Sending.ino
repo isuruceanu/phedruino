@@ -4,13 +4,11 @@
 #define LED 13
 
 Manchester *manchester;
-uint8_t data[2];
+uint8_t data[2] = {0x9D, 0x26};
 
 void setup() {
   Serial.println("Start sending");
   manchester = new Manchester(M_PIN);
-  data[0] = 0x9D;
-  data[1] = 0x26;
   pinMode(11, OUTPUT);
   Serial.begin(9600);
   Serial.println("Starting");
@@ -19,9 +17,9 @@ void setup() {
 void loop() {
   if (manchester->GetStatus() == Manchester::Idle)
   {
-     manchester->Send(data, (uint8_t)2);  
+     manchester->Send(data, (uint8_t)2, true);  
   }
-
+  
   Serial.println("end of loop");
 }
 

@@ -7,7 +7,7 @@ Manchester::Manchester(uint8_t pin)
 	_status = Idle;
 }
 
-void Manchester::Send(uint8_t *data, uint8_t len)
+void Manchester::Send(uint8_t *data, uint8_t len, boolean sendPre)
 {
 	if (len > 20) len = 20;
 
@@ -16,10 +16,19 @@ void Manchester::Send(uint8_t *data, uint8_t len)
 	_byteIndex = 0;
 	_bufferLen = len;
 	uint8_t i = 0;
+	uint8_t shift =0;
+
+	if (sendPre)
+	{
+		_buffer[0] = 0x02;
+		_buffer[len+1] = 0x8000;
+		shift = 1;
+		_bufferLen += 2;
+	}
 
 	do
 	{
-		_buffer[i] = encode(data[i]);
+		_buffer[i + shift] = encode(data[i]);
 		i++;
 		
 	}while(i < len);
@@ -36,16 +45,17 @@ void Manchester::OnInterrupt()
 		sendBit();
 		_bitIndex++;
 	}
-	else
+	
+	if (_bitIndex == 16)
 	{
 		_bitIndex = 0;
 		_byteIndex++;
-		
-		if (_byteIndex >= _bufferLen)
-		{
-			stopTransmition();
-			_status = Idle;
-		}
+	}
+
+	if (_byteIndex >= _bufferLen)
+	{
+		stopTransmition();
+		_status = Idle;
 	}
 }
 
@@ -81,14 +91,7 @@ void Manchester::sendBit()
 {
 	if (_byteIndex > _bufferLen) return;
 
-	if (isset(_buffer[_byteIndex], 15- _bitIndex))
-	{
-		digitalWrite(_pin, HIGH);
-	}
-	else
-	{
-		digitalWrite(_pin, LOW);
-	}
+	digitalWrite(_pin, isset(_buffer[_byteIndex], 15- _bitIndex));
 	
 }
 
@@ -156,7 +159,7 @@ void Manchester::StartRead(uint8_t len)
 	pinMode(_pin, INPUT); //set pin as input
 	digitalWrite(_pin, HIGH); // enable pullup resistor
 
-	attachInterrupt(_pin, onPinChangeInterrupt, CHANGE);
+	//attachInterrupt(_pin, onPinChangeInterrupt, CHANGE);
 }
 
 uint8_t * Manchester::GetReadData()

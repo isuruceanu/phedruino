@@ -59,7 +59,7 @@ class Manchester
     Status GetStatus();
     uint16_t GetByte(uint8_t data);
   
-    void Send(uint8_t *data, uint8_t len);
+    void Send(uint8_t *data, uint8_t len, boolean sendPre);
     void StartRead(uint8_t len);
 
     uint8_t* GetReadData();
