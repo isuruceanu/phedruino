@@ -36,12 +36,6 @@ manchester:  1 0 0 1 0 1 1 0 1 0 1 0 0 1 1 0
   #include <pins_arduino.h>
 #endif
 
- #define IDLE 0
- #define SENDING 1
-
-
-
-
 class Manchester
 {
   public:
@@ -55,7 +49,7 @@ class Manchester
       ReadingReady = 4,
     };
 
-    Manchester(uint8_t pin); //ctor
+    Manchester(uint8_t tx, uint8_t rx); //ctor
     Status GetStatus();
     uint16_t GetByte(uint8_t data);
   
@@ -64,19 +58,16 @@ class Manchester
 
     uint8_t* GetReadData();
 
-    void OnInterrupt();
+    void OnTxTimerMatchInterrup();
+
+    void OnRxPinChangeInterrupt();
+    void OnRxTimerOverflowInterrupt();
     void ShowStatus();
 
-   /* 
-    void StartReading();
-    void StopReading();
-    int8_t PopQueue(struct Queue* queue);
-    void PushQueue(struct Queue* queue, const uint8_t c);
-*/
- 
  private:
     void startTransmition();
-    void stopTransmition();  
+    void stopTransmition(); 
+    void stopReading(); 
     
     
 
@@ -85,13 +76,19 @@ class Manchester
 
     uint16_t encode(uint8_t);
 
-    void onPinChangeInterrupt(void);
+    void configureTimer2(uint8_t);
   
-    uint8_t _pin;
+    uint8_t _pinTx;
+    uint8_t _pinRx;
     uint16_t _buffer[20];
+    
+    uint8_t _rxBuffer[40];
+
     uint8_t _bufferLen = 0;
     uint8_t _bitIndex = 0;
     uint8_t _byteIndex = 0;
+    uint8_t _lineStatus = 0;
+    uint16_t _timeoutCount = 1000;
     Status _status;
 };
 
