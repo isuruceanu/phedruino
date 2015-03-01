@@ -56,7 +56,7 @@ void Manchester::OnTxTimerMatchInterrup()
 	if (_byteIndex >= _bufferLen)
 	{
 		stopTransmition();
-		_status = Idle;
+		_status = CommandSent;
 	}
 }
 
@@ -103,6 +103,9 @@ void Manchester::ShowStatus()
       case Idle:
        Serial.println("Idle");
        break;
+      case CommandSent:
+      	Serial.println("CommandSent") ;
+      	break;
       case Sending:
         Serial.println("Sending");
         break;
@@ -116,6 +119,10 @@ void Manchester::ShowStatus()
       	Serial.println("Reading ready");
       	break;
    }
+
+    Serial.print("ByteIndex=");
+	Serial.println(_byteIndex);
+	
 }
 
 /// Will use Timer0 at 2KHz CTC mode. 
@@ -127,7 +134,7 @@ void Manchester::startTransmition()
 	//set pin as OUTPUT
 	pinMode(_pinTx, OUTPUT);
 
-	configureTimer2(124); // = (16*10^6) / (2000 * 64) -1 (must be less 255));
+	configureTimer2(249); // = (16*10^6) / (2000 * 64) -1 (must be less 255));
   	
   	// enable timer compare interrupt
   	sbi(TIMSK2,OCIE2A);
@@ -168,33 +175,35 @@ void Manchester::configureTimer2(uint8_t ocr)
  5. Read line status so we know where it started
  6. enable interruptions
  */
-void Manchester::StartRead(uint8_t len)
+void Manchester::StartRead(uint8_t len, void (*func)())
 {
-	if (_status != Idle) return;
-	
-	pinMode(_pinRx, INPUT); //set pin as input
-	digitalWrite(_pinTx, HIGH); // enable pullup resistor
-	_byteIndex = 0;
-	_timeoutCount = 50;
-	_bufferLen = len;
-	
-	uint8_t i =0;
-	do
+	if (_status == CommandSent) 
 	{
-		_rxBuffer[i] = 0;		
-		i++;
-	}while(i < _byteIndex);
-	
-	cli();
-	
-	_status = Reading;
+		delay(15);
+		_status = Reading;
+		pinMode(_pinRx, INPUT); //set pin as input
+		digitalWrite(_pinRx, HIGH); // enable pullup resistor
+		
+		_byteIndex = 0;
+		_timeoutCount = 2000;
+		_bufferLen = len;
 
-	configureTimer2(0xFF);
-	sbi(TIMSK2, TOIE2);
 
-	_lineStatus = digitalRead(_pinRx);
+		
+		uint8_t i =0;
+		do
+		{
+			_rxBuffer[i] = 0;		
+			i++;
+		}while(i < _bufferLen);
+		
+		cli();
+		attachInterrupt(0, func, CHANGE);
+		configureTimer2(0xFF);
+		sbi(TIMSK2, TOIE2);
 
-	sei();
+		sei();
+	}
 }
 
 void Manchester::stopReading()
@@ -205,14 +214,13 @@ void Manchester::stopReading()
 	sei();
 }
 
-uint8_t * Manchester::GetReadData()
+volatile uint8_t * Manchester::GetReadData()
 {
 	if (_status = ReadingReady)
 	{
 		Serial.print("ByteIndex=");
 		Serial.println(_byteIndex);
-		Serial.print("Line=");
-		Serial.println(_lineStatus);
+		
 		Serial.println("_rxBuffer");
 		
 		uint8_t i =0;
@@ -225,6 +233,11 @@ uint8_t * Manchester::GetReadData()
 	return _rxBuffer;
 }
 
+void Manchester::SetIdle()
+{
+	_status = Idle;
+}
+
 /* 
 	When a transition is detected store the timer1 OCR0A value to buffer
 	and clear the OCR0A
@@ -234,6 +247,9 @@ void Manchester::OnRxPinChangeInterrupt()
     _rxBuffer[_byteIndex] = TCNT2;
     TCNT2 = 0;
     
+    Serial.print("Int: _bufferLen:"); Serial.println(_bufferLen);
+    _timeoutCount = 2000;
+
     if (_byteIndex >= _bufferLen)
     {
     	stopReading();

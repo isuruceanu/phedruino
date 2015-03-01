@@ -44,25 +44,28 @@ class Manchester
     {
       Idle = 0,
       Sending = 1,
-      Reading = 2,
-      ReadingTimeout =3,
-      ReadingReady = 4,
+      CommandSent = 2,
+      Reading = 3,
+      ReadingTimeout =4,
+      ReadingReady = 5,
     };
 
     Manchester(uint8_t tx, uint8_t rx); //ctor
     Status GetStatus();
+    void SetIdle();
     uint16_t GetByte(uint8_t data);
   
     void Send(uint8_t *data, uint8_t len, boolean sendPre);
-    void StartRead(uint8_t len);
+    void StartRead(uint8_t len, void (*func)());
 
-    uint8_t* GetReadData();
+    volatile uint8_t* GetReadData();
 
     void OnTxTimerMatchInterrup();
 
     void OnRxPinChangeInterrupt();
     void OnRxTimerOverflowInterrupt();
     void ShowStatus();
+
 
  private:
     void startTransmition();
@@ -80,14 +83,14 @@ class Manchester
   
     uint8_t _pinTx;
     uint8_t _pinRx;
-    uint16_t _buffer[20];
+    volatile uint16_t _buffer[20];
     
-    uint8_t _rxBuffer[40];
+    volatile uint8_t _rxBuffer[40];
 
-    uint8_t _bufferLen = 0;
-    uint8_t _bitIndex = 0;
-    uint8_t _byteIndex = 0;
-    uint8_t _lineStatus = 0;
+    volatile uint8_t _bufferLen = 0;
+    volatile uint8_t _bitIndex = 0;
+    volatile uint8_t _byteIndex = 0;
+    
     uint16_t _timeoutCount = 1000;
     Status _status;
 };
