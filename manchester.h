@@ -36,6 +36,8 @@ manchester:  1 0 0 1 0 1 1 0 1 0 1 0 0 1 1 0
   #include <pins_arduino.h>
 #endif
 
+#define TICKS_PER_MS F_CPU/64/1000   
+
 class Manchester
 {
   public:
@@ -53,45 +55,33 @@ class Manchester
     Manchester(uint8_t tx, uint8_t rx); //ctor
     Status GetStatus();
     void SetIdle();
-    uint16_t GetByte(uint8_t data);
-  
+      
     void Send(uint8_t *data, uint8_t len, boolean sendPre);
-    void StartRead(uint8_t len, void (*func)());
+    void StartRead(uint8_t len);
 
-    volatile uint8_t* GetReadData();
+    uint8_t* GetReadData();
 
-    void OnTxTimerMatchInterrup();
-
-    void OnRxPinChangeInterrupt();
-    void OnRxTimerOverflowInterrupt();
-    void ShowStatus();
-
-
+    void OnTimerMatchAInterrupt();
+    void OnTimerMatchBInterrupt();
+    void OnPinChangeInterrupt();
+    
  private:
-    void startTransmition();
-    void stopTransmition(); 
-    void stopReading(); 
     
-    
-
-    void send(uint8_t data);
-    void sendBit();
-
-    uint16_t encode(uint8_t);
-
     void configureTimer2(uint8_t);
   
     uint8_t _pinTx;
+    
     uint8_t _pinRx;
-    volatile uint16_t _buffer[20];
-    
-    volatile uint8_t _rxBuffer[40];
+    volatile uint8_t* _rxPort;
+    volatile uint8_t* _rxPCMSK;
+    uint8_t _rxBitMask;
 
-    volatile uint8_t _bufferLen = 0;
-    volatile uint8_t _bitIndex = 0;
-    volatile uint8_t _byteIndex = 0;
+    uint8_t* _rxBuffer;
+    uint8_t _bufferLen = 0;
+    uint8_t _bitIndex = 0;
+      
+    uint8_t _isFirstTransition = 0;
     
-    uint16_t _timeoutCount = 1000;
     Status _status;
 };
 
