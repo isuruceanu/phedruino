@@ -14,8 +14,10 @@ void setup() {
 }
 
 void loop() {
-  manchester->Send(data, (uint8_t)1, true);
   delay(1000);
+  Serial.println("sending...");
+  manchester->Send(data, (uint8_t)1, true);
+
 }
 
 ISR(TIMER2_COMPA_vect)

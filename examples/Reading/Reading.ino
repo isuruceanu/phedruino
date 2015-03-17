@@ -1,45 +1,38 @@
 #include <manchester.h>
+#include "util.h"
 
-#define TX_PIN 12
-#define RX_PIN 2
+#define TX_PIN 8
+#define RX_PIN 3 //Ext-INT1
 #define LED 13
 
 Manchester *manchester;
-uint8_t data[2];
-
-static void onPinChange()
-{
-  manchester->OnRxPinChangeInterrupt();
-}
+uint8_t *data;
 
 void setup()
 {
   Serial.begin(9600);
-  Serial.println("Start reading prg.");
+  Serial.println("eStart reading TEST");
+  delay(100);
   manchester = new Manchester(TX_PIN, RX_PIN);
-  pinMode(LED, OUTPUT);
 
 }
 
 void loop()
 {
-  if (manchester->GetStatus() == Manchester::Idle)
+  delay(40);
+  if (manchester->GetStatus() != Manchester::Reading)
   {
-    Serial.println("Start READING");
-    manchester->StartRead(30);
-    attachInterrupt(0, onPinChange, CHANGE);
-  }  
-  
-  if (manchester->GetStatus() == Manchester::ReadingReady)
-  {
-    manchester->GetReadData();
+    Serial.println("---Reading again");
+    manchester->StartRead(1, true);
   }
-  
-  manchester->ShowStatus();
-  
 }
 
-ISR(TIMER2_OVF_vect)
+ISR(INT1_vect)
 {
-   manchester->OnRxTimerOverflowInterrupt(); 
+  manchester->OnPinChangeInterrupt();
+}
+
+ISR(TIMER2_COMPA_vect)
+{
+   manchester->OnTimerMatchAInterrupt(); 
 }

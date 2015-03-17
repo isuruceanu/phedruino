@@ -57,7 +57,7 @@ class Manchester
     void SetIdle();
       
     void Send(uint8_t *data, uint8_t len, boolean sendPre);
-    void StartRead(uint8_t len);
+    void StartRead(uint8_t len, boolean hasStartBit);
 
     uint8_t* GetReadData();
 
@@ -65,25 +65,29 @@ class Manchester
     void OnTimerMatchBInterrupt();
     void OnPinChangeInterrupt();
     
+    
  private:
     
     void configureTimer2(uint8_t);
+    void stopTimer2(void);
   
     uint8_t _pinTx;
     
     uint8_t _pinRx;
     volatile uint8_t* _rxPort;
     volatile uint8_t* _rxPCMSK;
+    uint8_t _rxPCIE;
     uint8_t _rxBitMask;
 
     uint8_t* _rxBuffer;
     uint8_t _bufferLen = 0;
     uint8_t _bitIndex = 0;
-      
-    uint8_t _isFirstTransition = 0;
+    volatile uint8_t _first;
+    
     
     Status _status;
 };
+
 
 
 #endif

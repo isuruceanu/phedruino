@@ -1,6 +1,7 @@
 #include "manchester.h"
 #include "util.h"
 
+
 #define R2(n)     n,     n + 2*64,     n + 1*64,     n + 3*64
 #define R4(n) R2(n), R2(n + 2*16), R2(n + 1*16), R2(n + 3*16)
 #define R6(n) R4(n), R4(n + 2*4 ), R4(n + 1*4 ), R4(n + 3*4 )
@@ -16,17 +17,25 @@ uint8_t reverseByte(uint8_t v)
 }
 
 
-
 Manchester::Manchester(uint8_t tx, uint8_t rx)
 {
 	_pinTx = tx;
 	_pinRx = rx;
 	_status = Idle;
-		
-	_rxPort = portInputRegister(digitalPinToPort(_pinRx));
 
-	_rxPCMSK = digitalPinToPCMSK(_pinRx); 
-	_rxBitMask = digitalPinToBitMask(_pinRx);
+	
+	//digitalWrite(_pinRx, HIGH); // disenable pullup resistor
+		
+	// _rxPort = portInputRegister(digitalPinToPort(_pinRx));
+
+	// _rxPCMSK = digitalPinToPCMSK(_pinRx); 
+	// _rxBitMask = digitalPinToBitMask(_pinRx);
+	// _rxPCIE = digitalPinToPCICRbit(_pinRx);
+
+	pinMode(_pinTx, OUTPUT);
+	digitalWrite(_pinTx, LOW);
+	
+	
 }
 
 void Manchester::Send(uint8_t *data, uint8_t len, boolean hasStartBit)
@@ -75,7 +84,55 @@ void Manchester::Send(uint8_t *data, uint8_t len, boolean hasStartBit)
   	sei();
 }
 
+/*
+	 Reading: 
+ 1. Set the Rx pin as output with pull up
+ 2. Disable interuption
+ 3. Enable pin change interruption to identify the transition in the middle of bit. Also need to know when data start to come using _isFirsttransition.
+ 4. Comfigure timer2 CTC mode with 3/4 of pariod
+ 
+ */
+void Manchester::StartRead(uint8_t len, boolean hasStartBit)
+{
+	if (_status == Reading) return;
+		cli();
+		pinMode(_pinRx, INPUT);
+		digitalWrite(_pinRx, HIGH);
 
+		_status = Reading;
+		
+		_bitIndex = 0;
+		
+		_rxBuffer = new uint8_t[len + 2];
+		
+		do{
+			_rxBuffer[_bitIndex++] = 0;
+		} while(_bitIndex < len);
+
+		_bufferLen = 10;//len * 8 + 2; //we need to receive _bufferLen bits;
+		_bitIndex = 0;
+		
+		_first = 1; //
+		
+		
+		configureTimer2(TICKS_PER_MS * 0.75);
+		TCCR2B = 0;//disable at this moment the timer
+     	sbi(TIMSK2, OCIE2A);
+		sbi(TIFR2, OCF2A);
+		TCNT2 = TICKS_PER_MS * 0.5;		
+		
+		
+		sbi(EICRA, ISC10);
+		sbi(EIMSK, INT1);
+		
+		sei();
+		
+}
+
+uint8_t * Manchester::GetReadData()
+{
+	return _rxBuffer;
+}
 
 Manchester::Status Manchester::GetStatus()
 {
@@ -88,6 +145,7 @@ void Manchester::configureTimer2(uint8_t ocr)
 	TCCR2A = 0;
 	TCCR2B = 0;
 	TCNT2 = 0;
+	OCR2B = 0;
 	OCR2A = ocr;
 	
 	// turn on CTC mode
@@ -96,47 +154,13 @@ void Manchester::configureTimer2(uint8_t ocr)
   	sbi(TCCR2B, CS22);
 }
 
-/*
-	 Reading: 
- 1. Set the Rx pin as output with pull up
- 2. Disable interuption
- 3. Enable pin change interruption to identify the transition in the middle of bit. Also need to know when data start to come using _isFirsttransition.
- 4. Comfigure timer2 CTC mode with 3/4 of pariod
- 
- */
-void Manchester::StartRead(uint8_t len)
+void Manchester::stopTimer2(void)
 {
-	if (_status == CommandSent) 
-	{
-		_status = Reading;
-		pinMode(_pinRx, INPUT); //set pin as input
-		digitalWrite(_pinRx, HIGH); // enable pullup resistor
-				
-		_bitIndex = 0;
-		
-		_rxBuffer = new uint8_t[len];
-		do{
-			_rxBuffer[_bitIndex++] = 0;
-		} while(_bitIndex < len);
-
-		_bufferLen = len * 8; //we need to receive _bufferLen bits;
-		_bitIndex = 0;
-
-		_isFirstTransition = 1; //
-		
-		cli();
-		
-		*_rxPCMSK |= _rxBitMask;//enable Pin Change interrupt
-
-		configureTimer2(TICKS_PER_MS * 0.75);
-		
-		sei();
-	}
-}
-
-uint8_t * Manchester::GetReadData()
-{
-	return _rxBuffer;
+	cbi(TIMSK2,OCIE2A);
+	cbi(TIMSK2,OCIE2B);
+	TCCR2A = 0;
+	TCCR2B = 0;
+	TCNT2 = 0;
 }
 
 void Manchester::SetIdle()
@@ -152,43 +176,30 @@ void Manchester::SetIdle()
 */
 void Manchester::OnPinChangeInterrupt()
 {
-    if (_isFirstTransition)
-    {
-    	_isFirstTransition = 0; //we received first transition which should be bit edge, set flag to 0 and skip it. 
-    	return;
+	cli();
+    //disable pin interruption
+   cbi(EIMSK, INT1);
+
+    if (_first == 1) _first = 0; 
+    else TCNT2 = 0;
+
+    Serial.print("TCNT:"); Serial.println(TCNT2);
+
+    if (_bitIndex > _bufferLen){
+    	_status = ReadingReady;
+		stopTimer2();
     }
-
-    *_rxPCMSK &= ~_rxBitMask; //disable pin interruption
-    //here we at the bit transition so read the rx pin store it and start timer2 with 3/4 of period 
-
-    
-    if (!(*_rxPort & _rxBitMask)) //not because idle->active = 0 and active->idle = 1
-    {
-    	_rxBuffer[_bitIndex / 8] |= (1 << (_bitIndex % 8));
+    else{
+  		sbi(TCCR2B, CS22);
     }
-    
-
-	if (_bitIndex < _bufferLen) {
-		*_rxPCMSK |= _rxBitMask; //enable pin change interruption
-		TCCR2A = 0;
-		sbi(TIMSK2,OCIE2A);
-		_bitIndex++;
-
-	} else {
-		//received all required bits
-		_status = ReadingReady;
-		cli();
-		*_rxPCMSK &= ~_rxBitMask;
-		cbi(TIMSK2, TOIE2);
-		sei();
-	}
-
+    sei();
+ 
 }
 
 
 /*
 	Use COMPA interrupt to set line depending on seding bit and set TCCR2B 
-	to fire COMPB interrupt in match
+	to fire COMPB interrupt on match
 */
 void Manchester::OnTimerMatchAInterrupt()
 {
@@ -204,26 +215,34 @@ void Manchester::OnTimerMatchAInterrupt()
 		
 		if (_bitIndex > _bufferLen)
 		{
-			cbi(TIMSK2,OCIE2A);
-			cbi(TIMSK2,OCIE2B);
-			TCCR2A = 0;
-			TCCR2B = 0;
-			TCNT2 = 0;
+			stopTimer2();
 			_status = CommandSent;
 			digitalWrite(_pinTx, LOW);
 		}
 	}
 
-	if (_status == Reading)
-	{
-		*_rxPCMSK |= _rxBitMask; //just enable pin change interruption
+	if (_status == Reading)	{
+		
+		digitalWrite(_pinTx, HIGH);
+		TCCR2B = 0;
+
+		if (digitalRead(_pinRx) == 1) Serial.print(1);
+		else Serial.print(0);
+
+
+ 		//enable pin interruption at any change
+ 		sbi(EIMSK, INT1);
+   		_bitIndex++;
+   		digitalWrite(_pinTx, LOW);
+   		
 	}
 	sei();
+	
 }
 
 /* 
 	Use COMPB to toggle line in the middle of transition 
-	and disable COMP B match interrupt so we do not taggle accedantly on before COMP A fires
+	and disable COMPB match interrupt so we do not taggle accedantly before COMPA fires
 */
 void Manchester::OnTimerMatchBInterrupt()
 {
@@ -234,5 +253,3 @@ void Manchester::OnTimerMatchBInterrupt()
 	cbi(TIFR2, OCF2B);
 	sei();
 }
-
-
