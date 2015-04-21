@@ -1,7 +1,7 @@
 #include <manchester.h>
 
-#define TX_PIN 8
-#define RX_PIN 11
+#define TX_PIN 4
+#define RX_PIN 3
 #define LED 13
 
 Manchester *manchester;

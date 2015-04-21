@@ -1,7 +1,6 @@
 #include "manchester.h"
 #include "util.h"
 
-
 #define R2(n)     n,     n + 2*64,     n + 1*64,     n + 3*64
 #define R4(n) R2(n), R2(n + 2*16), R2(n + 1*16), R2(n + 3*16)
 #define R6(n) R4(n), R4(n + 2*4 ), R4(n + 1*4 ), R4(n + 3*4 )
@@ -16,7 +15,6 @@ uint8_t reverseByte(uint8_t v)
     return reverseTable[v];
 }
 
-
 Manchester::Manchester(uint8_t tx, uint8_t rx)
 {
 	_pinTx = tx;
@@ -24,9 +22,7 @@ Manchester::Manchester(uint8_t tx, uint8_t rx)
 	_status = Idle;
 
 	pinMode(_pinTx, OUTPUT);
-	digitalWrite(_pinTx, LOW);
-	
-	
+	digitalWrite(_pinTx, LOW);	
 }
 
 void Manchester::Send(uint8_t *data, uint8_t len, boolean hasStartBit)
@@ -93,14 +89,14 @@ void Manchester::StartRead(uint8_t len, boolean hasStartBit)
 		
 		_bitIndex = 0;
 		
-		_rxBuffer = new uint8_t[len + 2];
-		
-		do{
-			_rxBuffer[_bitIndex++] = 0;
-		} while(_bitIndex < len);
+		uint8_t buffer = len  + hasStartBit ? 2 : 0;
 
-		_bufferLen = 10;//len * 8 + 2; //we need to receive _bufferLen bits;
-		_bitIndex = 0;
+		_rxBuffer = new uint8_t[buffer];
+		
+		if (hasStartBit)
+			_bitIndex = 7;
+
+		_bufferLen = (len * 8) + _bitIndex + (hasStartBit ? 1 : 0);
 		
 		_first = 1; //
 		
@@ -113,10 +109,6 @@ void Manchester::StartRead(uint8_t len, boolean hasStartBit)
      	sbi(TIMSK2, OCIE2A);
 		sbi(TIFR2, OCF2A);
 		TCNT2 = TICKS_PER_MS * 0.5;		
-		
-		
-		
-		
 		sei();
 		
 }
@@ -175,9 +167,6 @@ void Manchester::OnPinChangeInterrupt()
     if (_first == 1) _first = 0; 
     else TCNT2 = 0;
     
-
-    //Serial.print("TCNT:"); Serial.println(TCNT2);
-
     if (_bitIndex > _bufferLen){
     	_status = ReadingReady;
 		stopTimer2();
@@ -192,7 +181,7 @@ void Manchester::OnPinChangeInterrupt()
 
 
 /*
-	Use COMPA interrupt to set line depending on seding bit and set TCCR2B 
+	Use COMPA interrupt to set line depending on sending bit and set TCCR2B 
 	to fire COMPB interrupt on match
 */
 void Manchester::OnTimerMatchAInterrupt()
@@ -205,8 +194,7 @@ void Manchester::OnTimerMatchAInterrupt()
 		
 		sbi(TIMSK2, OCIE2B);
 		sbi(TIFR2, OCF2B);
-		
-		
+				
 		if (_bitIndex > _bufferLen)
 		{
 			stopTimer2();
@@ -217,19 +205,16 @@ void Manchester::OnTimerMatchAInterrupt()
 
 	if (_status == Reading)	{
 		
-		digitalWrite(_pinTx, HIGH);
 		TCCR2B = 0;
 
 		if (digitalRead(_pinRx) == 1) 
 		{
-			_rxBuffer[_bitIndex / 8] |= (1 << (_bitIndex % 8));
+			_rxBuffer[_bitIndex / 8] |= (1 << (7 - (_bitIndex % 8)));
 		}
-
+		
  		//enable pin interruption at any change
  		sbi(EIMSK, INT1);
    		_bitIndex++;
-   		digitalWrite(_pinTx, LOW);
-   		
 	}
 	sei();
 	
