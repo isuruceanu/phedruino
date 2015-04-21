@@ -23,15 +23,6 @@ Manchester::Manchester(uint8_t tx, uint8_t rx)
 	_pinRx = rx;
 	_status = Idle;
 
-	
-	//digitalWrite(_pinRx, HIGH); // disenable pullup resistor
-		
-	// _rxPort = portInputRegister(digitalPinToPort(_pinRx));
-
-	// _rxPCMSK = digitalPinToPCMSK(_pinRx); 
-	// _rxBitMask = digitalPinToBitMask(_pinRx);
-	// _rxPCIE = digitalPinToPCICRbit(_pinRx);
-
 	pinMode(_pinTx, OUTPUT);
 	digitalWrite(_pinTx, LOW);
 	
@@ -96,9 +87,8 @@ void Manchester::StartRead(uint8_t len, boolean hasStartBit)
 {
 	if (_status == Reading) return;
 		cli();
-		pinMode(_pinRx, INPUT);
-		digitalWrite(_pinRx, HIGH);
-
+		pinMode(_pinRx, INPUT_PULLUP);
+		
 		_status = Reading;
 		
 		_bitIndex = 0;
@@ -114,6 +104,9 @@ void Manchester::StartRead(uint8_t len, boolean hasStartBit)
 		
 		_first = 1; //
 		
+		sbi(EICRA, ISC10);
+		sbi(EIMSK, INT1);
+		cbi(EIFR, INTF1);
 		
 		configureTimer2(TICKS_PER_MS * 0.75);
 		TCCR2B = 0;//disable at this moment the timer
@@ -122,8 +115,7 @@ void Manchester::StartRead(uint8_t len, boolean hasStartBit)
 		TCNT2 = TICKS_PER_MS * 0.5;		
 		
 		
-		sbi(EICRA, ISC10);
-		sbi(EIMSK, INT1);
+		
 		
 		sei();
 		
@@ -134,7 +126,7 @@ uint8_t * Manchester::GetReadData()
 	return _rxBuffer;
 }
 
-Manchester::Status Manchester::GetStatus()
+volatile Manchester::Status Manchester::GetStatus()
 {
 	return _status;
 }
@@ -178,12 +170,13 @@ void Manchester::OnPinChangeInterrupt()
 {
 	cli();
     //disable pin interruption
-   cbi(EIMSK, INT1);
+    cbi(EIMSK, INT1);
 
     if (_first == 1) _first = 0; 
     else TCNT2 = 0;
+    
 
-    Serial.print("TCNT:"); Serial.println(TCNT2);
+    //Serial.print("TCNT:"); Serial.println(TCNT2);
 
     if (_bitIndex > _bufferLen){
     	_status = ReadingReady;
@@ -192,6 +185,7 @@ void Manchester::OnPinChangeInterrupt()
     else{
   		sbi(TCCR2B, CS22);
     }
+    
     sei();
  
 }
@@ -226,9 +220,10 @@ void Manchester::OnTimerMatchAInterrupt()
 		digitalWrite(_pinTx, HIGH);
 		TCCR2B = 0;
 
-		if (digitalRead(_pinRx) == 1) Serial.print(1);
-		else Serial.print(0);
-
+		if (digitalRead(_pinRx) == 1) 
+		{
+			_rxBuffer[_bitIndex / 8] |= (1 << (_bitIndex % 8));
+		}
 
  		//enable pin interruption at any change
  		sbi(EIMSK, INT1);

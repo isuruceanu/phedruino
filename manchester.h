@@ -53,7 +53,7 @@ class Manchester
     };
 
     Manchester(uint8_t tx, uint8_t rx); //ctor
-    Status GetStatus();
+    volatile Status GetStatus();
     void SetIdle();
       
     void Send(uint8_t *data, uint8_t len, boolean sendPre);
@@ -74,18 +74,14 @@ class Manchester
     uint8_t _pinTx;
     
     uint8_t _pinRx;
-    volatile uint8_t* _rxPort;
-    volatile uint8_t* _rxPCMSK;
-    uint8_t _rxPCIE;
-    uint8_t _rxBitMask;
-
+    
     uint8_t* _rxBuffer;
-    uint8_t _bufferLen = 0;
-    uint8_t _bitIndex = 0;
+    volatile uint8_t _bufferLen = 0;
+    volatile uint8_t _bitIndex = 0;
     volatile uint8_t _first;
     
     
-    Status _status;
+    volatile Status _status;
 };
 
 
